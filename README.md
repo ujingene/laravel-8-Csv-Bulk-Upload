@@ -1,64 +1,143 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400"></a></p>
+# Laravel 8 Csv Bulk Upload
 
-<p align="center">
-<a href="https://travis-ci.org/laravel/framework"><img src="https://travis-ci.org/laravel/framework.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+# The Application uses two methods to process csv files
 
-## About Laravel
+## Maatswebsite Excel Package
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+App\Actions\MaatswebsiteUpload
+```
+try {
+    ...
+    //import the rows
+    Excel::import(new InvoicesImport, $file_path);
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+} catch (Exception $e) {
+    //
+}
+```
+### Makes use of the import file
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+App\Imports\InvoicesImport
+```
+/**
+* @param array $row
+*
+* @return \Illuminate\Database\Eloquent\Model|null
+*/
+public function model(array $row)
+{
+    $InvoiceDate = Carbon::parse($row['InvoiceDate'])->toDateTimeString();
+    return new Invoice([
+        'InvoiceNo' => $row['InvoiceNo'],
+        'StockCode' => $row['StockCode'],
+        'Description' => $row['Description'],
+        'Quantity' => $row['Quantity'],
+        'InvoiceDate' => $InvoiceDate,
+        'UnitPrice' => $row['UnitPrice'],
+        'CustomerID' => $row['CustomerID'],
+        'Country' => $row['Country']
+    ]);
+}
 
-## Learning Laravel
+public function batchSize(): int
+{
+    return 1000;
+}
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+public function chunkSize(): int
+{
+    return 1000;
+}
+```
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 1500 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Laravel Custom Function to process 
+```
+try{
+    $flagname = Storage::path($flag->file_name);
+    
+    $rows = $this->csvRowCount->execute($flagname);
+    $items_per_run = 100;
+    for ($i=0; $i <= $rows; $i = $i+$items_per_run+1) {
+        $chunk = $this->csvSlice->execute($flagname, $i, $items_per_run);
+        foreach ($chunk as $item) {
+            echo "item stock code no = " .  $item->StockCode . "\n";
 
-## Laravel Sponsors
+            $item->InvoiceDate = Carbon::parse($item->InvoiceDate)->toDateTimeString();
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+                $invoice[] = Invoice::create((array) $item);
+            } 
+        }
+    } catch (\Exception $e)
+    {
+        return $e->getMessage();
+    }
 
-### Premium Partners
+```
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
+# Setup & Configuration
+Open up a terminal and navigate to the root directory of this project.
 
-## Contributing
+```
+cp .env.example .env
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## install composer dependecies
+```
+composer run install
+```
 
-## Code of Conduct
+## install npm dependecies
+```
+npm i
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Generate Application Key
 
-## Security Vulnerabilities
+```
+php artisan key:generate
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Clear Application Configurations and Cache by running the following commands
 
-## License
+```
+php artisan config:cache
+php artisan optimize:clear
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## update the database configurations with your preferred details
+
+```
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=marvel
+DB_USERNAME=root
+DB_PASSWORD=
+```
+
+## Run migrations
+```
+php artisan migrate
+```
+
+### run composer update
+```
+composer update
+```
+
+### start laravel dev server
+```
+php artisan serve
+```
+
+### open another terminal to execute queue worker
+```
+php artisan queue:work
+```
+
+or listen to fired events 
+
+```
+php artisan queue:listen
+```
+
