@@ -115,6 +115,13 @@ DB_USERNAME=root
 DB_PASSWORD=
 ```
 
+## change CACHE_DRIVER and QUEUE_CONNECTION to database
+
+```
+CACHE_DRIVER=database
+QUEUE_CONNECTION=database
+```
+
 ## Run migrations
 ```
 php artisan migrate
